@@ -1,13 +1,8 @@
 config: {}
-description: Default LXD profile
+description: Default Whonix Client profile
 devices:
   eth0:
     name: eth0
-    nictype: bridged
-    parent: whonixbr0
-    type: nic
-  eth1:
-    name: eth1
     nictype: bridged
     parent: whonixveth0
     type: nic
@@ -15,5 +10,5 @@ devices:
     path: /
     pool: default
     type: disk
-name: whonix-profile-gateway
+name: whonix-client
 used_by: []

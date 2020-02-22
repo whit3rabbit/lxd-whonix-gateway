@@ -42,6 +42,11 @@ Create bridge network with Whonix IP space/gateway (eth0):
 sudo lxc network create whonixbr0 ipv4.address=10.0.2.2/24 ipv4.nat=true ipv6.address=none
 ```
 
+Create a bridge network for client IP space (eth1):
+```
+sudo lxc network create whonixveth0 ipv4.address=10.152.152.0/18 ipv4.nat=true ipv4.dhcp.gateway=10.152.152.10 ipv6.address=none
+```
+
 Create a network profile to use the bridge (whonixbr0):
 ```
 sudo lxc profile create whonix-profile-gateway
@@ -66,6 +71,30 @@ sudo lxc exec whgw1 -- apt-get-update-plus dist-upgrade
 Troubleshooting
 ```
 sudo lxc exec whgw1 bash
+```
+
+## WIP: Connecting to other containers
+
+I will use the Kali Linux distro as an example but others could be used:
+
+Here the IP address of the Kali box is set to 10.152.152.12 and can be changed if needed, but not to same IP as gateway (.10).
+
+Set up network profile (do once):
+```
+sudo lxc profile create whonix-profile-client
+cat whonix-profile-client.yml | sudo lxc profile edit whonix-profile-client
+lxc network attach-profile whonix-profile-client default eth0
+```
+
+Create kali box
+```
+sudo lxc launch images:kali/current/amd64 kali-whonix
+sudo lxc exec kali-whonix -- printf "auto lo\niface lo inet loopback\n\nauto eth0\niface eth0 inet static\naddress 10.152.152.12\nnetmask 255.255.192.0\ngateway 10.152.152.10\n" > /etc/network/interfaces
+sudo lxc exec kali-whonix -- echo nameserver 10.152.152.10 > /etc/resolv.conf
+sudo lxc stop kali-whonix # Restart box
+sudo lxc profile assign kali-whonix whonix-profile-client
+sudo lxc start kali-whonix
+sudo lxc exec kali-whonix -- bash
 ```
 
 ## Stats
