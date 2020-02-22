@@ -1,0 +1,216 @@
+# Created by whit3rabbit
+# Requires TOR running on host machine for apt connection
+
+image:
+  name: whonix-gateway-cli-x86_64
+  distribution: whonix
+  release: buster
+  description: |-
+    Whonix {{ image.release }}
+  architecture: x86_64
+
+source:
+  downloader: debootstrap
+  same_as: buster
+  url: http://ftp.debian.org/debian
+  keys:
+    - 0x6D33866EDD8FFA41C0143AEDDCC9EFBF77E11517 # https://ftp-master.debian.org/keys.html
+    - 0x916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA # https://www.whonix.org/wiki/Whonix_Signing_Key
+
+targets:
+  lxc:
+    create-message: |-
+      You just created an {{ image.description }} container.
+      No default root or user password are set by LXC.
+
+    config:
+      - type: all
+        before: 5
+        content: |-
+          lxc.include = LXC_TEMPLATE_CONFIG/ubuntu.common.conf
+
+      - type: user
+        before: 5
+        content: |-
+          lxc.include = LXC_TEMPLATE_CONFIG/ubuntu.userns.conf
+
+      - type: all
+        after: 4
+        content: |-
+          lxc.include = LXC_TEMPLATE_CONFIG/common.conf
+
+      - type: user
+        after: 4
+        content: |-
+          lxc.include = LXC_TEMPLATE_CONFIG/userns.conf
+
+      - type: all
+        content: |-
+          lxc.arch = {{ image.architecture_personality }}
+
+files:
+ - path: /etc/hostname
+   generator: hostname
+
+ - path: /etc/hosts
+   generator: hosts
+
+ - path: /etc/resolvconf/resolv.conf.d/original
+   generator: remove
+
+ - path: /etc/resolvconf/resolv.conf.d/tail
+   generator: remove
+
+ - path: /etc/machine-id
+   generator: remove
+
+ - path: /etc/network/interfaces
+   generator: dump
+   content: |-
+     # interfaces(5) file used by ifup(8) and ifdown(8)
+     # Include files from /etc/network/interfaces.d:
+     source-directory /etc/network/interfaces.d
+
+ - path: /etc/network/interfaces.d/30_non-qubes-whonix
+   generator: dump
+   content: |-
+     ## Copyright (C) 2012 - 2018 ENCRYPTED SUPPORT LP <adrelanos@riseup.net>
+     ## See the file COPYING for copying conditions.
+
+     #### meta start
+     #### project Whonix
+     #### category networking
+     #### non_qubes_whonix_only yes
+     #### gateway_only yes
+     #### description
+     ## network interfaces configuration eth0 (external network interface) and eth1 (internal network interface)
+     ##
+     ## static network configuration
+     ##
+     ## eth0
+     #address 10.0.2.15
+     #netmask 255.255.255.0
+     #gateway 10.0.2.2
+     ##
+     ## eth1
+     #address 10.152.152.10
+     #netmask 255.255.192.0
+     #### meta end
+
+     ## for more information see interfaces(5)
+
+     ## Loopback interface.
+     auto lo
+     iface lo inet loopback
+
+     ## When using Virtual Machines (not Physical Isolation),
+     ## - eth0 is the NAT interface to communicate with VirtualBox
+     ## - used to get access to the internet
+     ## - it will get an IP address such as 10.0.2.15
+     ## - Thus, the this IP address can NOT cause conflicts
+     ##   with your LAN network or router.
+     ## We no longer use DHCP.
+     ## https://phabricator.whonix.org/T559
+     #auto eth0
+     #iface eth0 inet dhcp
+
+     ## NAT interface to communicate with VirtualBox.
+     auto eth0
+     iface eth0 inet static
+             address 10.0.2.15
+             netmask 255.255.255.0
+             gateway 10.0.2.2
+             ## broadcast required?
+             #broadcast 10.0.2.255
+
+     ## When using Virtual Machines (not Physical Isolation),
+     ## - eth1 is an internal, isolated, virtual network,
+     ## - provided and only visible inside Virtual Machines
+     ## - solely used to communicate with the Workstation.
+     ## - it has has no access to the host
+     ## - Thus, the following IP address can NOT cause conflicts
+     ##   with your LAN network or router.
+     auto eth1
+     iface eth1 inet static
+            ## INT_IP and INT_IF
+            address 10.152.152.10
+            netmask 255.255.192.0
+            ## Out commented.
+            ## For what do we need network and broadcast anyway?
+            #network 192.168.0.0
+            #broadcast 192.168.0.255
+
+packages:
+  manager: apt
+  update: true
+  cleanup: true
+
+  repositories:
+    - name: sources.list
+      url: |-
+        deb http://deb.debian.org/debian {{ image.release }} main contrib non-free
+        deb http://deb.debian.org/debian-security/ {{ image.release }}/updates main contrib non-free
+      architectures:
+        - amd64
+        - i386
+#  sets:
+#    - packages:
+#      - openssh-client
+#      - vim
+#      action: install
+
+actions:
+  - trigger: post-update
+    action: |-
+      #!/bin/sh
+      set -eux
+
+      apt-get update && apt-get install -y apt-transport-tor apt-transport-https wget gpg sudo locales
+
+      mkdir -p /root/.gnupg
+      chmod --recursive og-rwx /root/.gnupg
+
+      # Create Whonix user account
+      getent group sudo >/dev/null 2>&1 || groupadd --system sudo
+      useradd --create-home -s /bin/bash -G sudo -U user
+
+      # Mirror how Whonix does apt for debian
+      echo "deb tor+https://deb.debian.org/debian-security/ buster/updates main contrib non-free" > /etc/apt/sources.list
+      echo "deb tor+https://deb.debian.org/debian buster main contrib non-free" >> /etc/apt/sources.list
+
+      # Create whonix source files (these will be created in correct folder by apt packages. Post-packages will erase this.
+      echo "deb tor+https://deb.whonix.org buster main contrib non-free" >> /etc/apt/sources.list
+
+      # Get Whonix gpg key and import
+      wget https://www.whonix.org/patrick.asc -O /root/patrick.asc && GNUPGHOME=/root/.gnupg gpg --import /root/patrick.asc
+      apt-key --keyring /etc/apt/trusted.gpg.d/whonix.gpg add /root/patrick.asc
+
+      echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && locale-gen en_US.utf8 && /usr/sbin/update-locale LANG=en_US.UTF-8
+
+      # Get whonix packages
+      rm /etc/machine-id  # Fix for anon-base-files
+      apt-get update && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y non-qubes-whonix-gateway-cli
+
+  - trigger: post-packages
+    action: |-
+      #!/bin/sh
+      set -eux
+
+      # Make sure the locale is built and functional
+      locale-gen en_US.UTF-8
+      update-locale LANG=en_US.UTF-8
+
+      # Cleanup underlying /run
+      mount -o bind / /mnt
+      rm -rf /mnt/run/*
+      umount /mnt
+
+      # Cleanup temporary shadow paths
+      rm /etc/*-
+
+      # zero out apt list
+      echo "" > /etc/apt/sources.list
+
+mappings:
+  architecture_map: debian

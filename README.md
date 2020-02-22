@@ -1,2 +1,105 @@
-# lxd-whonix-gateway
+# LXD/LXC Whonix Gateway CLI image for x64
+
 Test repository for LXD/LXC for Whonix distro
+
+* This has not been tested for security/leaks.
+* Use with caution / development!
+
+## Preqrequiste
+
+
+* LXD/LXC
+* Distrobuilder https://distrobuilder.readthedocs.io/en/latest/
+* TOR
+
+## Instructions 
+
+Clone this repository
+
+```
+git clone https://github.com/whit3rabbit/lxd-whonix-gateway.git
+cd lxd-whonix-gateway
+```
+
+Build the image (only need to be done once):
+
+```
+# Make sure TOR is running for whonix apt packages
+sudo systemctl start tor
+sudo $HOME/go/bin/distrobuilder build-lxd whonix-gateway-distrobuilder.yml
+```
+
+Create Whonix LXC image named "whonix-gateway-cli":
+```
+sudo lxc image import lxd.tar.xz rootfs.squashfs --alias whonix-gateway-cli
+```
+
+Create bridge network with Whonix IP space/gateway (eth0):
+```
+sudo lxc network create whonixbr0 ipv4.address=10.0.2.2/24 ipv4.nat=true ipv6.address=none
+```
+
+Create a network profile to use the bridge (whonixbr0):
+```
+sudo lxc profile create whonix-profile-gateway
+cat whonix-profile-gateway.yml | sudo lxc profile edit whonix-profile-gateway
+```
+
+Create your first container named whgw1 from image and assign the network profile "whonix-gateway":
+```
+sudo lxc launch whonix-gateway-cli whgw1
+sudo lxc stop whgw1 # Stop to assign network profile
+sudo lxc profile assign whgw1 whonix-profile-gateway
+```
+Start container
+```
+sudo lxc start whgw1
+```
+First time commands inside whonix gateway:
+```
+sudo lxc exec whgw1 -- whonixsetup
+sudo lxc exec whgw1 -- apt-get-update-plus dist-upgrade
+```
+Troubleshooting
+```
+sudo lxc exec whgw1 bash
+```
+
+## Stats
+
+Running idle about 150-350mb of memory usage. 
+1% of CPU usage
+446.74MB Image size
+
+
+## Cleanup/Removal
+
+To stop container
+```
+sudo lxc stop whgw1
+```
+To delete container
+```
+sudo lxc delete whgw1
+```
+To delete image
+```
+sudo lxc image delete whonix-gateway-cli
+```
+
+## Monitoring
+
+* Sysdig
+
+Install sysdig 
+```
+curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | sudo bash
+```
+Monitor containers CPU/memory/process uage
+```
+sudo csysdig -vcontainers # View all containers
+```
+Monitor all commands inside container from host
+```
+sudo sysdig -pc -c spy_users container.name=whgw1
+```
