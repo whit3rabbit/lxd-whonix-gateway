@@ -5,8 +5,11 @@ Test repository for LXD/LXC for Whonix distro
 * This has not been tested for security/leaks.
 * Use with caution / development!
 
-## Preqrequiste
+## Prerequiste
 
+Tested on latest Debian release but could probably be built on any Linux distro.
+
+Requires installation of:
 
 * LXD/LXC
 * Distrobuilder https://distrobuilder.readthedocs.io/en/latest/
@@ -67,9 +70,9 @@ sudo lxc exec whgw1 bash
 
 ## Stats
 
-Running idle about 150-350mb of memory usage. 
-1% of CPU usage
-446.74MB Image size
+* Running idle about 150-350mb of memory usage.
+* 1% of CPU usage
+* 446.74MB Image size
 
 
 ## Cleanup/Removal
