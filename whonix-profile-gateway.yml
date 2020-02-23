@@ -1,5 +1,5 @@
 config: {}
-description: Default LXD profile
+description: Whonix gateway profile
 devices:
   eth0:
     name: eth0
@@ -9,7 +9,7 @@ devices:
   eth1:
     name: eth1
     nictype: bridged
-    parent: whonixveth0
+    parent: whonixbr1
     type: nic
   root:
     path: /

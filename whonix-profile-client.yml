@@ -4,7 +4,7 @@ devices:
   eth0:
     name: eth0
     nictype: bridged
-    parent: whonixveth0
+    parent: whonixbr1
     type: nic
   root:
     path: /
