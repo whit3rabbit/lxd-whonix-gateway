@@ -99,18 +99,38 @@ lxc launch ubuntu:18.04 bionic
 lxc stop bionic
 lxc profile assign bionic whonix-profile-client
 lxc start bionic
-lxc exec kali-whonix -- echo "nameserver 10.152.152.10" > /etc/resolv.conf
+lxc exec bionic -- echo "nameserver 10.152.152.10" > /etc/resolv.conf
 ```
 
-Kali as example:
+## Other
+
+VPN in LXC
+
+In order for my container to work as a VPN server I ended up just running as privileged:
 ```
-lxc launch images:kali/current/amd64 kali-whonix
-lxc exec kali-whonix -- printf "auto lo\niface lo inet loopback\n\nauto eth0\niface eth0 inet static\naddress 10.152.152.12\nnetmask 255.255.192.0\ngateway 10.152.152.10\n" > /etc/network/interfaces
-lxc exec kali-whonix -- echo "nameserver 10.152.152.10" > /etc/resolv.conf
-lxc stop kali-whonix # Restart box
-lxc profile assign kali-whonix whonix-profile-client
-lxc start kali-whonix
-lxc exec kali-whonix -- bash
+Host:
+lxc config set bionic security.privileged true
+iptables -t nat -A PREROUTING -p udp --dport [PORT ON VPS] -j DNAT --to-destination [LXC-BIONIC-IP]:1194
+iptables -t nat -A POSTROUTING -j MASQUERADE
+
+Container:
+curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
+chmod +x wireguard-install.sh
+./wireguard-install.sh
+```
+
+However, if privileged is too scary, you may try these instructions which didn't work for me:
+```
+# https://gist.github.com/wastrachan/8d75ecf39db1fc25ae73c93989a8df11
+Host:
+lxc config set CONTAINER raw.lxc 'lxc.cgroup.devices.allow = c 10:200 rwm'
+lxc config device add CONTAINER tun unix-char path=/dev/net/tun
+
+Container:
+1. mknod /dev/net/tun c 10 200
+2. install OpenVPN (https://github.com/Nyr/openvpn-install or manual)
+3. edit /lib/systemd/system/openvpn@.service -- comment out/remove `LimitNPROC=10`
+4. systemctl daemon-reload or reboot container
 ```
 
 ## Stats

@@ -34,7 +34,6 @@ RUN echo "SOCKSPort 9050" >> /etc/tor/torrc &&\
 # Set working folder
 RUN git clone https://github.com/whit3rabbit/lxd-whonix-gateway.git /distrobuilder
 WORKDIR /distrobuilder
-RUN mkdir /output
 
 COPY helper/docker-build.sh build.sh
 RUN chmod 755 build.sh
