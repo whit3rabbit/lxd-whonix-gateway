@@ -12,42 +12,39 @@ Tested on latest Debian release but could probably be built on any Linux distro.
 Requires installation of:
 
 * LXD/LXC
-* Distrobuilder
-* TOR
+* Docker (optional for image build)
 
+## Easy build LXC image for Whonix Gateway CLI with Docker
+
+Clone this repository and run as root.
+
+** You will need to change Docker to "devicemapper" in order to build images **
+** This may break functionality with other docker images/containers **
 ```
-apt update
-apt install -y snapd tor git debootstrap
-echo "export PATH=$PATH:/snap/bin" >> ~/.bashrc
-echo "SOCKSPort 9050" >> /etc/tor/torrc
-echo "RunAsDaemon 1" >> /etc/tor/torrc
-. ~/.bashrc
-snap install lxd
-snap install distrobuilder --classic
-systemctl start tor
+systemctl stop docker
+print "{\n   "storage-driver": "devicemapper"\n}" > /etc/docker/daemon.json
+systemctl start docker
 ```
-
-## Instructions for Whonix Gateway set up
-
-Clone this repository
-
+Build rootfs for LXC
 ```
 cd ~
 git clone https://github.com/whit3rabbit/lxd-whonix-gateway.git
 cd lxd-whonix-gateway
+docker build . -t whonix-distrobuilder1
+docker run --privileged -v output:/output -it whonix-distrobuilder1
+```
+Copy files out of container
+```
+docker ps -a # Get container name
+docker cp [container-name]:/distrobuilder/lxd.tar.xz
+docker cp [container-name]:/distrobuilder/rootfs.squashfs
 ```
 
-Build the image (only need to be done once):
-
-```
-# Make sure TOR is running for whonix apt packages
-# systemctl start tor
-distrobuilder build-lxd whonix-gateway-distrobuilder.yml
-```
+## Import rootfs files to create LXC image
 
 Create Whonix LXC image named "whonix-gateway-cli":
 ```
-lxd init
+#lxd init  # If first time running LXD
 lxc image import lxd.tar.xz rootfs.squashfs --alias whonix-gateway-cli
 ```
 
