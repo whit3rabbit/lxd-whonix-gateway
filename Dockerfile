@@ -38,4 +38,4 @@ WORKDIR /distrobuilder
 COPY helper/docker-build.sh build.sh
 RUN chmod 755 build.sh
 
-CMD ["/root/build.sh"]
+CMD ["/distrobuilder/build.sh"]
