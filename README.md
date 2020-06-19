@@ -22,7 +22,8 @@ Clone this repository and run as root.
 ** This may break functionality with other docker images/containers **
 ```
 systemctl stop docker
-print "{\n   "storage-driver": "devicemapper"\n}" > /etc/docker/daemon.json
+touch /etc/docker/daemon.json
+printf '{\n   "storage-driver": "devicemapper"\n}' > /etc/docker/daemon.json
 systemctl start docker
 ```
 Build rootfs for LXC
