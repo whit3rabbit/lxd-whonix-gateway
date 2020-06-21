@@ -1,11 +1,17 @@
 #!/bin/bash
 # For debian based system
+# Script to set up LXC virtualized Whonix Gateway on VPS
+# Creates LXC Debian VPN server that uses Whonix Gateway for all traffic 
+# Copy the client.ovpn file to your local computer and you can connect to VPN to have all traffic routed through 
 
-# Why root...because I tested it on root?
+# Check for root...this could possibly be removed
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit
 fi
+
+# For OPENVPN configuration
+PUBLIC_IP=`curl ipinfo.io/ip`
 
 #################################################################
 # Install/Setup lxd
@@ -88,14 +94,16 @@ lxc exec debian-vpn -- curl -O https://raw.githubusercontent.com/angristan/openv
 lxc exec debian-vpn -- chmod +x openvpn-install.sh
 
 # Install openvpn. Change auto install if you want custom ports
-lxc exec --env AUTO_INSTALL=y debian-vpn -- ./openvpn-install.sh
+lxc exec --env AUTO_INSTALL=y --env ENDPOINT=${PUBLIC_IP} debian-vpn -- ./openvpn-install.sh
 
 # Copy client.openvpn file
 lxc exec debian-vpn -- cat /root/client.ovpn > client.ovpn
 
-# Because we use TOR, cloudflare doesn't like that we look for IP
+# Enable openvpn at startup and start openvpn
+lxc exec debian-vpn -- systemctl enable openvpn
+lxc exec debian-vpn -- systemctl start openvpn
 
-PUBLIC_IP=`curl ipinfo.io/ip`
+# Because we use TOR, cloudflare doesn't like that we look for IP
 echo "Modify client.ovpn file with your public IP: ${PUBLIC_IP}"
 
 # Get Debian-VPN IP
@@ -105,14 +113,20 @@ DEBIAN-VPN-IP=`lxc list debian-vpn --format csv | grep eth0 | grep -E -o "([0-9]
 echo "What port should VPS listen on for VPN server (1 through 65535): "
 read VPNPORT
 
+# IPTABLES to forward public VPN IP to LXC container
 iptables -t nat -A PREROUTING -p udp --dport ${VPNPORT} -j DNAT --to-destination ${DEBIAN-VPN-IP}:1194
 iptables -t nat -A POSTROUTING -j MASQUERADE
+iptables-save > lxc-who-vpn.fw
+
+# To survive reboot
+apt-get -y install iptables-persistent
 
 echo "All finished!"
 echo "Modify remote/port line in client.ovpn with: remote ${PUBLIC_IP} ${VPNPORT}"
+echo "You may need to allow VPN port ${VPNPORT} on VPS firewall rule"
 echo "To stop/start LXC containers:"
-echo "Debian VPN container: lxc stop debian-vpn && lxc start debian-vpn"
 echo "Whonix Gateway: lxc stop whgw1 && lxc start whgw1"
+echo "Debian VPN container: lxc stop debian-vpn && lxc start debian-vpn"
 
 #################################################################
 # Cleanup
