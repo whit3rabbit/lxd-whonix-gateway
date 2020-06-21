@@ -165,14 +165,22 @@ actions:
       #!/bin/sh
       set -eux
 
-      apt-get update && apt-get install -y apt-transport-tor apt-transport-https wget gpg sudo locales
-
-      mkdir -p /root/.gnupg
-      chmod --recursive og-rwx /root/.gnupg
+      # apt-get stuff
+      apt-get update && apt-get install -y apt-transport-tor apt-transport-https wget gpg sudo locales debconf-utils
 
       # Create Whonix user account
       getent group sudo >/dev/null 2>&1 || groupadd --system sudo
       useradd --create-home -s /bin/bash -G sudo -U user
+
+      # Needed for security-misc
+      addgroup --system console
+      addgroup --system console-unrestricted
+      usermod -a -G console user
+      usermod -a -G console root
+
+      # gnupg
+      mkdir -p /root/.gnupg
+      chmod --recursive og-rwx /root/.gnupg
 
       # Mirror how Whonix does apt for debian
       echo "deb tor+https://deb.debian.org/debian-security/ buster/updates main contrib non-free" > /etc/apt/sources.list
@@ -185,11 +193,25 @@ actions:
       wget https://www.whonix.org/patrick.asc -O /root/patrick.asc && GNUPGHOME=/root/.gnupg gpg --import /root/patrick.asc
       apt-key --keyring /etc/apt/trusted.gpg.d/whonix.gpg add /root/patrick.asc
 
+      # Locales
       echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && locale-gen en_US.utf8 && /usr/sbin/update-locale LANG=en_US.UTF-8
 
+
+      # As long as this script is in place, dpkg triggers won’t cause daemons to start, stop, or restart.
+      echo -e '#!/bin/bash\nexit 101' > /usr/sbin/policy-rc.d
+      chmod +x /usr/sbin/policy-rc.d
+      
       # Get whonix packages
       rm /etc/machine-id  # Fix for anon-base-files
       apt-get update && \
+
+      # Older version of whonix-gw-network-conf doesn't fail with lock on /etc/resolv.conf
+      wget https://mirrors.ulayer.net/whonix/whonixdevelopermetafiles/internal/pool/main/w/whonix-gw-network-conf/whonix-gw-network-conf_3.3-1_all.deb -O /tmp/whonix-gw-network-conf_3.3-1_all.deb
+      dpkg -i /tmp/whonix-gw-network-conf_3.3-1_all.deb && apt-mark hold whonix-gw-network-conf
+
+      DEBIAN_FRONTEND=noninteractive apt-get install -y security-misc 
+      DEBIAN_FRONTEND=noninteractive apt-get install -y whonix-gateway-packages-dependencies-pre
+      DEBIAN_FRONTEND=noninteractive apt-get install -y whonix-gateway-packages-dependencies-cli
       DEBIAN_FRONTEND=noninteractive apt-get install -y non-qubes-whonix-gateway-cli
 
   - trigger: post-packages
