@@ -16,6 +16,17 @@ fi
 PUBLIC_IP=`curl ipinfo.io/ip`
 
 #################################################################
+# Create swap file
+#################################################################
+echo "Creating a 4gb swap file"
+dd if=/dev/zero of=/root/swapfile01 bs=1M count=4024
+chmod 600 /root/swapfile01
+mkswap -L swap01 /root/swapfile01
+echo '/root/swapfile01        swap                    swap    defaults        0 0' >> /etc/fstab
+swapon -a
+swapon -s
+
+#################################################################
 # Install/Setup lxd
 #################################################################
 # Add contrib for zfsutils-linux
@@ -109,7 +120,9 @@ lxc exec debian-vpn -- echo "nameserver 10.152.152.10" > /etc/resolv.conf
 lxc config set debian-vpn security.privileged true
 
 # Update image and install curl
-lxc exec debian-vpn -- apt-get update && apt-get upgrade -y && apt-get install -y curl
+lxc exec debian-vpn -- apt-get update
+lxc exec debian-vpn -- apt-get upgrade -y 
+lxc exec debian-vpn -- apt-get install -y curl
 
 # Check if TOR is working
 lxc exec debian-vpn -- curl -s https://check.torproject.org/ | cat | grep -m 1 Congratulations | xargs
@@ -127,9 +140,6 @@ lxc exec debian-vpn -- cat /root/client.ovpn > client.ovpn
 # Enable openvpn at startup and start openvpn
 lxc exec debian-vpn -- systemctl enable openvpn
 lxc exec debian-vpn -- systemctl start openvpn
-
-# Because we use TOR, cloudflare doesn't like that we look for IP
-echo "Modify client.ovpn file with your public IP: ${PUBLIC_IP}"
 
 # Get Debian-VPN IP
 DEBIAN-VPN-IP=`lxc list debian-vpn --format csv | grep eth0 | grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
