@@ -1,5 +1,7 @@
 #!/bin/bash
-# For debian based system
+#
+# For debian based system (tested on Debian buster)
+#
 # Script to set up LXC virtualized Whonix Gateway on VPS
 # Creates LXC Debian VPN server that uses Whonix Gateway for all traffic 
 # Copy the client.ovpn file to your local computer and you can connect to VPN to have all traffic routed through 
@@ -16,9 +18,30 @@ PUBLIC_IP=`curl ipinfo.io/ip`
 #################################################################
 # Install/Setup lxd
 #################################################################
-sudo apt update && sudo apt install lxd git wget zfsutils-linux
+# Add contrib for zfsutils-linux
+echo 'deb http://deb.debian.org/debian/ buster contrib' >> '/etc/apt/sources.list'
+sudo apt update && 
+
+# Install zfs utils for zfs pool used by LXC
+sudo apt-get -y install linux-headers-$(uname -r)
+sudo apt-get -y install zfs-dkms zfsutils-linux spl-dkms
+sudo modprobe zfs
+sudo echo "zfs" >> /etc/modules
+
+# Install snap
+sudo apt-get -y install git wget snapd
+sudo systemctl restart snapd
+snap refresh
+snap install core &&
+snap install lxd &&
 sudo adduser $USER lxd
-newgrp lxd
+
+# Set up path
+PATH=/snap/bin:$PATH
+echo 'PATH=/snap/bin:$PATH' >> ~/.bashrc
+
+# Set up lxd
+lxd init --auto --storage-backend zfs
 
 #################################################################
 # Download/ Setup Whonix image/metadata
@@ -27,7 +50,7 @@ wget https://github.com/whit3rabbit/lxd-whonix-gateway/releases/download/v15.0/4
 wget https://github.com/whit3rabbit/lxd-whonix-gateway/releases/download/v15.0/meta-47d6dc01aac13b047214574190ad135df72f486f512dba0e0c598c90fdd2dd2a.tar.xz -O /tmp/metadata.tar.xz
 
 # Import Whonix Image
-lxc image import /tmp/metadta.tar.xz /tmp/rootfs.squashfs --alias whonix-gateway-cli
+lxc image import /tmp/metadata.tar.xz /tmp/rootfs.squashfs --alias whonix-gateway-cli
 
 # Get templates
 cd ~
@@ -54,17 +77,19 @@ lxc profile create whonix-profile-client
 cat whonix-profile-client.yml | lxc profile edit whonix-profile-client
 
 # Create your first container named whgw1 from image and assign the network profile "whonix-gateway":
-lxc launch whonix-gateway-cli whgw1 && lxc stop whgw1 && lxc profile assign whgw1 whonix-profile-gateway
+lxc launch whonix-gateway-cli whgw1 && 
+lxc stop whgw1 && 
+lxc profile assign whgw1 whonix-profile-gateway
 
 # Start container:
-lxc start whgw1
+lxc start whgw1 &&
 
 # Start connection to TOR ( this has to be done manually/interactively) until I can figure something out.. 
 # https://github.com/Whonix/whonixsetup/blob/master/usr/bin/whonixsetup
 lxc exec whgw1 -- whonixsetup
 
 # Update whonix
-lxc exec whgw1 -- apt-get-update-plus -y dist-upgrade
+lxc exec whgw1 -- apt-get-update-plus -y dist-upgrade &&
 
 # List lxc containers running
 lxc list
