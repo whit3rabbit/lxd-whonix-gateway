@@ -35,7 +35,7 @@ sudo apt update &&
 
 # Install zfs utils for zfs pool used by LXC
 sudo apt-get -y install linux-headers-$(uname -r)
-sudo apt-get -y install zfs-dkms zfsutils-linux spl-dkms
+DEBIAN_FRONTEND=noninteractive sudo apt-get -y install zfs-dkms zfsutils-linux spl-dkms
 sudo modprobe zfs
 sudo echo "zfs" >> /etc/modules
 
@@ -108,10 +108,10 @@ lxc list
 #################################################################
 # Setup VPN
 #################################################################
-lxc launch images:debian/buster debian-vpn
-lxc stop debian-vpn
+lxc launch images:debian/buster debian-vpn &&
+lxc stop debian-vpn &&
 lxc profile assign debian-vpn whonix-profile-client
-lxc start debian-vpn
+lxc start debian-vpn &&
 
 # Set DNS server to Whonix gateway in ubuntu box
 lxc exec debian-vpn -- echo "nameserver 10.152.152.10" > /etc/resolv.conf
@@ -142,26 +142,30 @@ lxc exec debian-vpn -- systemctl enable openvpn
 lxc exec debian-vpn -- systemctl start openvpn
 
 # Get Debian-VPN IP
-DEBIAN-VPN-IP=`lxc list debian-vpn --format csv | grep eth0 | grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
+DEBIANIP=`lxc list debian-vpn --format csv | grep eth0 | grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
 
 # Get VPN port for VPS
 echo "What port should VPS listen on for VPN server (1 through 65535): "
 read VPNPORT
 
 # IPTABLES to forward public VPN IP to LXC container
-iptables -t nat -A PREROUTING -p udp --dport ${VPNPORT} -j DNAT --to-destination ${DEBIAN-VPN-IP}:1194
+iptables -t nat -A PREROUTING -p udp --dport ${VPNPORT} -j DNAT --to-destination ${DEBIAN-IP}:1194
 iptables -t nat -A POSTROUTING -j MASQUERADE
 iptables-save > lxc-who-vpn.fw
 
 # To survive reboot
 apt-get -y install iptables-persistent
-
+echo "==========================================================================="
 echo "All finished!"
 echo "Modify remote/port line in client.ovpn with: remote ${PUBLIC_IP} ${VPNPORT}"
+echo ""
 echo "You may need to allow VPN port ${VPNPORT} on VPS firewall rule"
+echo ""
 echo "To stop/start LXC containers:"
 echo "Whonix Gateway: lxc stop whgw1 && lxc start whgw1"
 echo "Debian VPN container: lxc stop debian-vpn && lxc start debian-vpn"
+echo "==========================================================================="
+
 
 #################################################################
 # Cleanup
