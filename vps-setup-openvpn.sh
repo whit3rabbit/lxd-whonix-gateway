@@ -149,7 +149,7 @@ echo "What port should VPS listen on for VPN server (1 through 65535): "
 read VPNPORT
 
 # IPTABLES to forward public VPN IP to LXC container
-iptables -t nat -A PREROUTING -p udp --dport ${VPNPORT} -j DNAT --to-destination ${DEBIAN-IP}:1194
+iptables -t nat -A PREROUTING -p udp --dport ${VPNPORT} -j DNAT --to-destination ${DEBIANIP}:1194
 iptables -t nat -A POSTROUTING -j MASQUERADE
 iptables-save > lxc-who-vpn.fw
 
